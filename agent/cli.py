@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from agent.graph import run_task
+from agent.metrics import format_metrics_block
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,7 +36,7 @@ def _solve(task: str, repo: Path) -> int:
     print(f"Repo: {repo.resolve()}\n")
 
     try:
-        result = run_task(task, repo)
+        result, task_metrics = run_task(task, repo)
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -43,6 +44,8 @@ def _solve(task: str, repo: Path) -> int:
     print(f"Plan:\n{result['plan']}\n")
     print(f"Steps: {result['step_count']}")
     print(f"Files touched: {', '.join(result['files_touched']) or 'none'}")
+    print()
+    print(format_metrics_block(task_metrics))
 
     if result["done"] and not result["stuck"]:
         print("\nStatus: resolved (tests passed)")

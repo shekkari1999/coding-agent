@@ -16,3 +16,10 @@ DEFAULT_TEST_CMD = "pytest -x -q"
 
 # Repo root defaults to cwd when you run `agent solve`
 REPO_ROOT = Path(".")
+
+# Prometheus metrics (defaults derived from VLLM_BASE_URL)
+VLLM_METRICS_URL = os.getenv("VLLM_METRICS_URL", "")
+
+# Nominal $/1M tokens for cost display (self-hosted: set to 0 or your estimate)
+PROMPT_PRICE_PER_1M = float(os.getenv("PROMPT_PRICE_PER_1M", "0.10"))
+COMPLETION_PRICE_PER_1M = float(os.getenv("COMPLETION_PRICE_PER_1M", "0.20"))
