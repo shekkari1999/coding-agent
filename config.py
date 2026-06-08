@@ -3,23 +3,28 @@
 import os
 from pathlib import Path
 
-# vLLM OpenAI-compatible API (override for RunPod: export VLLM_BASE_URL=...)
+# vLLM OpenAI-compatible API
 VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
-MODEL = os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+VLLM_METRICS_URL = os.getenv("VLLM_METRICS_URL", "")
+
+MODEL_SMALL = os.getenv("VLLM_MODEL_SMALL", "Qwen/Qwen2.5-7B-Instruct")
+MODEL_LARGE = os.getenv("VLLM_MODEL_LARGE", MODEL_SMALL)
+MODEL = MODEL_SMALL  # backwards compat
 
 # Agent limits
 MAX_STEPS = 20
 MAX_TEST_RETRIES = 3
+ROUTER_FILE_THRESHOLD = 3
 
-# Default test command run after edits (override per task later)
+# Default test command run after edits
 DEFAULT_TEST_CMD = "pytest -x -q"
-
-# Repo root defaults to cwd when you run `agent solve`
 REPO_ROOT = Path(".")
 
-# Prometheus metrics (defaults derived from VLLM_BASE_URL)
-VLLM_METRICS_URL = os.getenv("VLLM_METRICS_URL", "")
+# Retrieval weights (baseline ignores recency)
+RELEVANCE_WEIGHT = float(os.getenv("RELEVANCE_WEIGHT", "0.7"))
+RECENCY_WEIGHT = float(os.getenv("RECENCY_WEIGHT", "0.3"))
 
-# Nominal $/1M tokens for cost display (self-hosted: set to 0 or your estimate)
+# Cost display
+GPU_PRICE_PER_HR = float(os.getenv("GPU_PRICE_PER_HR", "0.20"))
 PROMPT_PRICE_PER_1M = float(os.getenv("PROMPT_PRICE_PER_1M", "0.10"))
 COMPLETION_PRICE_PER_1M = float(os.getenv("COMPLETION_PRICE_PER_1M", "0.20"))

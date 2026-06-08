@@ -1,0 +1,6 @@
+{
+  "name": "math_bug",
+  "task": "fix the add function so tests pass",
+  "repo": "/tmp/agent-test",
+  "test_cmd": "pytest -x -q"
+}

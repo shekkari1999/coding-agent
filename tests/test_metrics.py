@@ -24,9 +24,11 @@ def test_compute_deltas():
     after_text = after_text.replace("10.0", "25.0").replace("40.0", "60.0")
     after = parse_prometheus(after_text)
 
-    metrics = compute_deltas(before, after)
+    metrics = compute_deltas(before, after, duration_s=10.0)
     assert metrics.prompt_tokens == 500
     assert metrics.generation_tokens == 30
     assert metrics.cache_hits == 15
     assert metrics.cache_queries == 20
     assert metrics.cache_hit_rate == 0.75
+    assert metrics.duration_s == 10.0
+    assert metrics.gpu_cost_usd > 0
