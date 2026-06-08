@@ -39,7 +39,10 @@ class TaskMetrics:
     cache_hits: int
     cache_queries: int
     cache_hit_rate: float | None
+    duration_s: float
     cost_usd: float
+    prefill_price_per_1m: float
+    decode_price_per_1m: float
     available: bool
 
 
@@ -63,7 +66,20 @@ def capture_metrics() -> MetricsSnapshot:
         return MetricsSnapshot.empty()
 
 
-def compute_deltas(before: MetricsSnapshot, after: MetricsSnapshot) -> TaskMetrics:
+def compute_token_cost(prompt_tokens: int, generation_tokens: int) -> float:
+    prefill_rate = config.prefill_price_per_1m()
+    decode_rate = config.decode_price_per_1m()
+    return (
+        prompt_tokens * prefill_rate / 1_000_000
+        + generation_tokens * decode_rate / 1_000_000
+    )
+
+
+def compute_deltas(
+    before: MetricsSnapshot,
+    after: MetricsSnapshot,
+    duration_s: float = 0.0,
+) -> TaskMetrics:
     prompt = _counter_delta(before, after, "vllm:prompt_tokens_total")
     generation = _counter_delta(before, after, "vllm:generation_tokens_total")
     hits = _counter_delta(before, after, "vllm:prefix_cache_hits")
@@ -78,10 +94,9 @@ def compute_deltas(before: MetricsSnapshot, after: MetricsSnapshot) -> TaskMetri
                 hit_rate = after.gauges[name]
                 break
 
-    cost = (
-        prompt * config.PROMPT_PRICE_PER_1M / 1_000_000
-        + generation * config.COMPLETION_PRICE_PER_1M / 1_000_000
-    )
+    prefill_rate = config.prefill_price_per_1m()
+    decode_rate = config.decode_price_per_1m()
+    cost = compute_token_cost(prompt, generation)
 
     available = any(
         name in before.counters or name in after.counters for name in METRIC_NAMES
@@ -93,7 +108,10 @@ def compute_deltas(before: MetricsSnapshot, after: MetricsSnapshot) -> TaskMetri
         cache_hits=hits,
         cache_queries=queries,
         cache_hit_rate=hit_rate,
+        duration_s=duration_s,
         cost_usd=cost,
+        prefill_price_per_1m=prefill_rate,
+        decode_price_per_1m=decode_rate,
         available=available,
     )
 
@@ -105,15 +123,15 @@ def format_metrics_block(metrics: TaskMetrics) -> str:
     lines = [
         "Metrics:",
         f"  Tokens:     {metrics.prompt_tokens:,} prompt / {metrics.generation_tokens:,} generated",
+        f"  Duration:   {metrics.duration_s:.1f}s",
+        f"  Cost:       ${metrics.cost_usd:.4f}",
+        f"              (${metrics.prefill_price_per_1m:.2f}/M prefill, ${metrics.decode_price_per_1m:.2f}/M decode)",
     ]
 
     if metrics.cache_hit_rate is not None:
         lines.append(f"  KV cache:   {metrics.cache_hit_rate * 100:.1f}% hit rate")
     elif metrics.cache_queries > 0:
         lines.append(f"  KV cache:   {metrics.cache_hits:,} hits / {metrics.cache_queries:,} queries")
-
-    if config.PROMPT_PRICE_PER_1M or config.COMPLETION_PRICE_PER_1M:
-        lines.append(f"  Cost:       ${metrics.cost_usd:.4f}")
 
     return "\n".join(lines)
 

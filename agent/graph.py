@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from langgraph.graph import END, StateGraph
@@ -41,11 +42,16 @@ def build_graph():
     return graph.compile()
 
 
-def run_task(task: str, repo_root: Path | None = None) -> tuple[AgentState, TaskMetrics]:
+def run_task(
+    task: str,
+    repo_root: Path | None = None,
+    baseline: bool = False,
+) -> tuple[AgentState, TaskMetrics]:
     root = (repo_root or config.REPO_ROOT).resolve()
     initial: AgentState = {
         "task": task,
         "repo_root": str(root),
+        "baseline": baseline,
         "plan": "",
         "messages": [],
         "last_tool_output": "",
@@ -54,10 +60,15 @@ def run_task(task: str, repo_root: Path | None = None) -> tuple[AgentState, Task
         "test_failures": 0,
         "step_count": 0,
         "last_test_output": "",
+        "recency_step": 0,
+        "recency_paths": {},
         "done": False,
         "stuck": False,
     }
     before = capture_metrics()
+    start = time.monotonic()
     result = build_graph().invoke(initial)
+    duration_s = time.monotonic() - start
     after = capture_metrics()
-    return result, compute_deltas(before, after)
+    metrics = compute_deltas(before, after, duration_s)
+    return result, metrics

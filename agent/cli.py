@@ -22,21 +22,39 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("."),
         help="Repo root (default: current directory)",
     )
+    solve.add_argument(
+        "--baseline",
+        action="store_true",
+        help="Baseline mode: always large model, no recency boost",
+    )
+
+    eval_parser = sub.add_parser("eval", help="Run the curated task suite")
+    eval_parser.add_argument(
+        "--baseline",
+        action="store_true",
+        help="Run in baseline mode",
+    )
 
     args = parser.parse_args(argv)
 
     if args.command == "solve":
-        return _solve(args.task, args.repo)
+        return _solve(args.task, args.repo, args.baseline)
+    if args.command == "eval":
+        from eval.run import run_suite
+
+        return run_suite(baseline=args.baseline)
 
     return 1
 
 
-def _solve(task: str, repo: Path) -> int:
+def _solve(task: str, repo: Path, baseline: bool) -> int:
+    mode = "baseline" if baseline else "optimized"
     print(f"Task: {task}")
-    print(f"Repo: {repo.resolve()}\n")
+    print(f"Repo: {repo.resolve()}")
+    print(f"Mode: {mode}\n")
 
     try:
-        result, task_metrics = run_task(task, repo)
+        result, task_metrics = run_task(task, repo, baseline=baseline)
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
