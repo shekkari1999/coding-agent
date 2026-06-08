@@ -17,6 +17,7 @@ class AgentState(TypedDict):
     plan: str
     messages: list[dict[str, str]]
     last_tool_output: str
+    last_tool: str
     files_touched: list[str]
     test_failures: int
     step_count: int
@@ -38,6 +39,8 @@ def plan_node(state: AgentState) -> AgentState:
             "role": "system",
             "content": (
                 "You are a coding agent. Use one tool per turn. "
+                "Explore with read, grep, list before writing. "
+                "After editing files, call done to run tests. "
                 "Respond with a single JSON object only.\n"
                 + tools.TOOL_DESCRIPTION
             ),
@@ -47,21 +50,38 @@ def plan_node(state: AgentState) -> AgentState:
             "content": f"Task: {state['task']}\n\nPlan:\n{plan}",
         },
     ]
-    return {**state, "plan": plan, "messages": messages, "step_count": 0}
+    return {
+        **state,
+        "plan": plan,
+        "messages": messages,
+        "step_count": 0,
+        "last_tool": "",
+    }
 
 
 def execute_node(state: AgentState) -> AgentState:
     step = state["step_count"] + 1
     if step > config.MAX_STEPS:
-        return {**state, "step_count": step, "stuck": True, "done": True}
+        return {
+            **state,
+            "step_count": step,
+            "stuck": True,
+            "done": True,
+            "last_tool": "limit",
+        }
 
     reply = llm.chat(state["messages"])
     action = _parse_action(reply)
     repo = Path(state["repo_root"])
+    last_tool = "parse_error"
 
     if action is None:
         result = tools.ToolResult(False, f"could not parse action from: {reply[:300]}")
+    elif action.get("tool") == "done":
+        result = tools.ToolResult(True, "ready to verify")
+        last_tool = "done"
     else:
+        last_tool = action.get("tool", "unknown")
         try:
             result = tools.dispatch(action["tool"], action, repo)
         except ValueError as exc:
@@ -85,6 +105,7 @@ def execute_node(state: AgentState) -> AgentState:
         **state,
         "messages": messages,
         "last_tool_output": result.output,
+        "last_tool": last_tool,
         "files_touched": files_touched,
         "step_count": step,
     }
@@ -121,7 +142,16 @@ def verify_node(state: AgentState) -> AgentState:
         "test_failures": failures,
         "done": stuck,
         "stuck": stuck,
+        "last_tool": "",
     }
+
+
+def route_after_execute(state: AgentState) -> str:
+    if state["done"] or state["stuck"]:
+        return "finish"
+    if state["last_tool"] in ("write", "done"):
+        return "verify"
+    return "execute"
 
 
 def route_after_verify(state: AgentState) -> str:

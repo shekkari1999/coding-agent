@@ -1,10 +1,11 @@
 """All tunable knobs in one place."""
 
+import os
 from pathlib import Path
 
-# vLLM OpenAI-compatible API
-VLLM_BASE_URL = "http://localhost:8000/v1"
-MODEL = "Qwen/Qwen2.5-7B-Instruct"
+# vLLM OpenAI-compatible API (override for RunPod: export VLLM_BASE_URL=...)
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+MODEL = os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 
 # Agent limits
 MAX_STEPS = 20

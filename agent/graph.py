@@ -7,7 +7,14 @@ from pathlib import Path
 from langgraph.graph import END, StateGraph
 
 import config
-from agent.nodes import AgentState, execute_node, plan_node, route_after_verify, verify_node
+from agent.nodes import (
+    AgentState,
+    execute_node,
+    plan_node,
+    route_after_execute,
+    route_after_verify,
+    verify_node,
+)
 
 
 def build_graph():
@@ -19,7 +26,11 @@ def build_graph():
 
     graph.set_entry_point("plan")
     graph.add_edge("plan", "execute")
-    graph.add_edge("execute", "verify")
+    graph.add_conditional_edges(
+        "execute",
+        route_after_execute,
+        {"execute": "execute", "verify": "verify", "finish": END},
+    )
     graph.add_conditional_edges(
         "verify",
         route_after_verify,
@@ -37,6 +48,7 @@ def run_task(task: str, repo_root: Path | None = None) -> AgentState:
         "plan": "",
         "messages": [],
         "last_tool_output": "",
+        "last_tool": "",
         "files_touched": [],
         "test_failures": 0,
         "step_count": 0,
