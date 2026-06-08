@@ -7,6 +7,7 @@ from pathlib import Path
 from langgraph.graph import END, StateGraph
 
 import config
+from agent.metrics import TaskMetrics, capture_metrics, compute_deltas
 from agent.nodes import (
     AgentState,
     execute_node,
@@ -40,7 +41,7 @@ def build_graph():
     return graph.compile()
 
 
-def run_task(task: str, repo_root: Path | None = None) -> AgentState:
+def run_task(task: str, repo_root: Path | None = None) -> tuple[AgentState, TaskMetrics]:
     root = (repo_root or config.REPO_ROOT).resolve()
     initial: AgentState = {
         "task": task,
@@ -56,4 +57,7 @@ def run_task(task: str, repo_root: Path | None = None) -> AgentState:
         "done": False,
         "stuck": False,
     }
-    return build_graph().invoke(initial)
+    before = capture_metrics()
+    result = build_graph().invoke(initial)
+    after = capture_metrics()
+    return result, compute_deltas(before, after)
