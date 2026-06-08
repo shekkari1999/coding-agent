@@ -16,7 +16,6 @@ MAX_STEPS = 20
 MAX_TEST_RETRIES = 3
 ROUTER_FILE_THRESHOLD = 3
 
-# Default test command run after edits
 DEFAULT_TEST_CMD = "pytest -x -q"
 REPO_ROOT = Path(".")
 
@@ -24,7 +23,23 @@ REPO_ROOT = Path(".")
 RELEVANCE_WEIGHT = float(os.getenv("RELEVANCE_WEIGHT", "0.7"))
 RECENCY_WEIGHT = float(os.getenv("RECENCY_WEIGHT", "0.3"))
 
-# Cost display
+# Token cost: amortize GPU $/hr across measured throughput (tokens/hr on your box)
 GPU_PRICE_PER_HR = float(os.getenv("GPU_PRICE_PER_HR", "0.20"))
-PROMPT_PRICE_PER_1M = float(os.getenv("PROMPT_PRICE_PER_1M", "0.10"))
-COMPLETION_PRICE_PER_1M = float(os.getenv("COMPLETION_PRICE_PER_1M", "0.20"))
+PREFILL_TOKENS_PER_HR = float(os.getenv("PREFILL_TOKENS_PER_HR", "600000"))
+DECODE_TOKENS_PER_HR = float(os.getenv("DECODE_TOKENS_PER_HR", "180000"))
+
+# Optional override: set both to use fixed $/1M instead of throughput-derived rates
+PROMPT_PRICE_PER_1M = os.getenv("PROMPT_PRICE_PER_1M")
+COMPLETION_PRICE_PER_1M = os.getenv("COMPLETION_PRICE_PER_1M")
+
+
+def prefill_price_per_1m() -> float:
+    if PROMPT_PRICE_PER_1M is not None:
+        return float(PROMPT_PRICE_PER_1M)
+    return GPU_PRICE_PER_HR / PREFILL_TOKENS_PER_HR * 1_000_000
+
+
+def decode_price_per_1m() -> float:
+    if COMPLETION_PRICE_PER_1M is not None:
+        return float(COMPLETION_PRICE_PER_1M)
+    return GPU_PRICE_PER_HR / DECODE_TOKENS_PER_HR * 1_000_000

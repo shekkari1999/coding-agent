@@ -40,8 +40,9 @@ class TaskMetrics:
     cache_queries: int
     cache_hit_rate: float | None
     duration_s: float
-    gpu_cost_usd: float
-    nominal_cost_usd: float
+    cost_usd: float
+    prefill_price_per_1m: float
+    decode_price_per_1m: float
     available: bool
 
 
@@ -65,6 +66,15 @@ def capture_metrics() -> MetricsSnapshot:
         return MetricsSnapshot.empty()
 
 
+def compute_token_cost(prompt_tokens: int, generation_tokens: int) -> float:
+    prefill_rate = config.prefill_price_per_1m()
+    decode_rate = config.decode_price_per_1m()
+    return (
+        prompt_tokens * prefill_rate / 1_000_000
+        + generation_tokens * decode_rate / 1_000_000
+    )
+
+
 def compute_deltas(
     before: MetricsSnapshot,
     after: MetricsSnapshot,
@@ -84,11 +94,9 @@ def compute_deltas(
                 hit_rate = after.gauges[name]
                 break
 
-    nominal = (
-        prompt * config.PROMPT_PRICE_PER_1M / 1_000_000
-        + generation * config.COMPLETION_PRICE_PER_1M / 1_000_000
-    )
-    gpu_cost = duration_s / 3600 * config.GPU_PRICE_PER_HR
+    prefill_rate = config.prefill_price_per_1m()
+    decode_rate = config.decode_price_per_1m()
+    cost = compute_token_cost(prompt, generation)
 
     available = any(
         name in before.counters or name in after.counters for name in METRIC_NAMES
@@ -101,8 +109,9 @@ def compute_deltas(
         cache_queries=queries,
         cache_hit_rate=hit_rate,
         duration_s=duration_s,
-        gpu_cost_usd=gpu_cost,
-        nominal_cost_usd=nominal,
+        cost_usd=cost,
+        prefill_price_per_1m=prefill_rate,
+        decode_price_per_1m=decode_rate,
         available=available,
     )
 
@@ -115,16 +124,14 @@ def format_metrics_block(metrics: TaskMetrics) -> str:
         "Metrics:",
         f"  Tokens:     {metrics.prompt_tokens:,} prompt / {metrics.generation_tokens:,} generated",
         f"  Duration:   {metrics.duration_s:.1f}s",
-        f"  GPU cost:   ${metrics.gpu_cost_usd:.4f}  (at ${config.GPU_PRICE_PER_HR}/hr)",
+        f"  Cost:       ${metrics.cost_usd:.4f}",
+        f"              (${metrics.prefill_price_per_1m:.2f}/M prefill, ${metrics.decode_price_per_1m:.2f}/M decode)",
     ]
 
     if metrics.cache_hit_rate is not None:
         lines.append(f"  KV cache:   {metrics.cache_hit_rate * 100:.1f}% hit rate")
     elif metrics.cache_queries > 0:
         lines.append(f"  KV cache:   {metrics.cache_hits:,} hits / {metrics.cache_queries:,} queries")
-
-    if config.PROMPT_PRICE_PER_1M or config.COMPLETION_PRICE_PER_1M:
-        lines.append(f"  Token est:  ${metrics.nominal_cost_usd:.4f}  (nominal, for comparison)")
 
     return "\n".join(lines)
 
