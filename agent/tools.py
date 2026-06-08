@@ -104,6 +104,7 @@ TOOL_DESCRIPTION = """Available tools (respond with JSON only):
 - {"tool":"grep","pattern":"regex","path":"."}
 - {"tool":"list","path":"."}
 - {"tool":"bash","command":"shell command"}
+- {"tool":"done"}  call when edits are ready; triggers test run
 """
 
 
