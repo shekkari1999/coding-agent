@@ -19,6 +19,3 @@ agent = "agent.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agent"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
