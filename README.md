@@ -1,14 +1,14 @@
 # coding-agent
 
-A small CLI coding agent. Give it a task in plain English — it explores your repo, edits or creates files, and tells you what it did.
+CLI coding agent. You give it a task; it explores your repo, edits or creates files, and reports what it changed.
 
-Works on any project. Inference runs on a GPU via [vLLM](https://github.com/vllm-project/vllm); the agent itself runs on your machine.
+Inference runs on a GPU via [vLLM](https://github.com/vllm-project/vllm). The agent runs on your machine.
 
 ## What it does
 
-1. **Plan** — breaks your task into steps
-2. **Act** — one tool per turn: read, grep, list, write, bash
-3. **Done** — prints a summary of changes
+1. **Plan** breaks the task into steps
+2. **Act** runs one tool per turn: read, grep, list, write, bash
+3. **Done** prints a summary
 
 ```
 you: agent "add error handling to the signup form"
@@ -24,8 +24,6 @@ you: agent "add error handling to the signup form"
          Summary + files touched
 ```
 
-No test runner, no eval suite — just the agent loop.
-
 ## Quick start
 
 **1. Install**
@@ -34,13 +32,13 @@ No test runner, no eval suite — just the agent loop.
 pip install -e .
 ```
 
-**2. Start vLLM** (on a GPU — local or cloud)
+**2. Start vLLM** on a GPU (local or cloud)
 
 ```bash
 ./scripts/start_vllm.sh
 ```
 
-Or on a remote box (e.g. vast.ai), tunnel to your Mac:
+Remote GPU (e.g. vast.ai), tunnel to your Mac:
 
 ```bash
 ssh -N -L 8001:127.0.0.1:8000 -p <PORT> root@<GPU_IP>
@@ -60,7 +58,7 @@ cd your-project
 agent "fix the validation bug in signup.py"
 ```
 
-The agent finds your git repo root automatically. Override with `--repo` if needed.
+Finds the git repo root from your cwd. Use `--repo` to override.
 
 ## Example output
 
@@ -82,9 +80,9 @@ Fixed email check to reject addresses without a domain dot.
 Status: done
 ```
 
-## LangSmith tracing (optional)
+## LangSmith tracing
 
-Trace every run in the [LangSmith UI](https://smith.langchain.com):
+Set env vars to send traces to [LangSmith](https://smith.langchain.com):
 
 ```bash
 export LANGSMITH_TRACING=true
@@ -92,13 +90,13 @@ export LANGSMITH_API_KEY="lsv2_..."
 export LANGSMITH_PROJECT="coding-agent"
 ```
 
-You get a trace per run: graph nodes (`plan`, `execute`), each LLM call, task metadata.
+Each run logs graph nodes (`plan`, `execute`), LLM calls, and task metadata.
 
 ## Stack
 
-- [LangGraph](https://github.com/langchain-ai/langgraph) — plan / execute state graph
-- [vLLM](https://github.com/vllm-project/vllm) — GPU inference (OpenAI-compatible API)
-- [LangSmith](https://smith.langchain.com) — optional observability
+- [LangGraph](https://github.com/langchain-ai/langgraph) for the plan/execute graph
+- [vLLM](https://github.com/vllm-project/vllm) for GPU inference
+- [LangSmith](https://smith.langchain.com) for tracing
 
 ## Project layout
 
