@@ -1,22 +1,22 @@
-"""Thin client for vLLM's OpenAI-compatible API."""
-
-from __future__ import annotations
-
 import httpx
+from langsmith import traceable
 
 import config
 
 
-def chat(messages: list[dict[str, str]], model: str | None = None) -> str:
-    model = model or config.MODEL
+@traceable(run_type="llm", name="vllm_chat")
+def chat(messages: list[dict[str, str]]) -> str:
+    headers = {}
+    if config.VLLM_API_KEY:
+        headers["Authorization"] = f"Bearer {config.VLLM_API_KEY}"
+
+    url = f"{config.VLLM_BASE_URL.rstrip('/')}/chat/completions"
     payload = {
-        "model": model,
+        "model": config.VLLM_MODEL,
         "messages": messages,
         "temperature": 0.2,
     }
-    url = f"{config.VLLM_BASE_URL.rstrip('/')}/chat/completions"
     with httpx.Client(timeout=120.0) as client:
-        resp = client.post(url, json=payload)
+        resp = client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
-        data = resp.json()
-    return data["choices"][0]["message"]["content"]
+        return resp.json()["choices"][0]["message"]["content"]
