@@ -1,60 +1,32 @@
-"""CLI entry point: agent solve \"<task>\""""
-
-from __future__ import annotations
-
 import argparse
 import sys
 from pathlib import Path
 
 from agent.graph import run_task
-from agent.metrics import format_metrics_block
+from agent.repo import find_repo_root
+from agent.tracing import status_line
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="agent")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    solve = sub.add_parser("solve", help="Run the agent on a task")
-    solve.add_argument("task", help="What to do, in plain English")
-    solve.add_argument(
+    parser = argparse.ArgumentParser(prog="agent", description="Coding agent")
+    parser.add_argument("task", help="What to do")
+    parser.add_argument(
         "--repo",
         type=Path,
-        default=Path("."),
-        help="Repo root (default: current directory)",
+        default=None,
+        help="Repo root (default: git root of cwd, else cwd)",
     )
-    solve.add_argument(
-        "--baseline",
-        action="store_true",
-        help="Baseline mode: always large model, no recency boost",
-    )
-
-    eval_parser = sub.add_parser("eval", help="Run the curated task suite")
-    eval_parser.add_argument(
-        "--baseline",
-        action="store_true",
-        help="Run in baseline mode",
-    )
-
     args = parser.parse_args(argv)
 
-    if args.command == "solve":
-        return _solve(args.task, args.repo, args.baseline)
-    if args.command == "eval":
-        from eval.run import run_suite
-
-        return run_suite(baseline=args.baseline)
-
-    return 1
-
-
-def _solve(task: str, repo: Path, baseline: bool) -> int:
-    mode = "baseline" if baseline else "optimized"
-    print(f"Task: {task}")
-    print(f"Repo: {repo.resolve()}")
-    print(f"Mode: {mode}\n")
+    repo = (args.repo or find_repo_root()).resolve()
+    print(f"Task: {args.task}")
+    print(f"Repo: {repo}")
+    if line := status_line():
+        print(line)
+    print()
 
     try:
-        result, task_metrics = run_task(task, repo, baseline=baseline)
+        result = run_task(args.task, repo)
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
@@ -62,20 +34,13 @@ def _solve(task: str, repo: Path, baseline: bool) -> int:
     print(f"Plan:\n{result['plan']}\n")
     print(f"Steps: {result['step_count']}")
     print(f"Files touched: {', '.join(result['files_touched']) or 'none'}")
-    print()
-    print(format_metrics_block(task_metrics))
+    if result.get("summary"):
+        print(f"\nSummary:\n{result['summary']}")
 
     if result["done"] and not result["stuck"]:
-        print("\nStatus: resolved (tests passed)")
+        print("\nStatus: done")
         return 0
-
-    if result["stuck"]:
-        print("\nStatus: stuck")
-        if result["last_test_output"]:
-            print(f"Last test output:\n{result['last_test_output']}")
-        return 2
-
-    print("\nStatus: stopped (step limit)")
+    print("\nStatus: stopped")
     return 2
 
 

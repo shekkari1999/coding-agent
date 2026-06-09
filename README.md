@@ -1,72 +1,71 @@
 # coding-agent
 
-Coding agent that plans, edits, runs tests, and retries on failure. Prints per-task cost and cache stats when done.
-
-Same LangGraph loop as the baseline, with model routing and cache-aware retrieval turned on.
-
-## How it works
+CLI coding agent: plan, use tools on a repo, report what it did.
 
 ```
-you: agent solve "fix the off-by-one in parse_date"
-         │
-         ▼
-    ┌─────────┐     ┌──────────┐     ┌─────────┐
-    │  plan   │ -> │ edit/run │ -> │  tests  │
-    └─────────┘     └──────────┘     └────┬────┘
-         ▲                                │
-         └-------- retry if fail --------┘
-         │
-         ▼
-    print cost + cache stats
+agent "fix the login bug"
+     │
+     ▼
+  plan → read / grep / write → done
 ```
 
-[LangGraph](https://github.com/langchain-ai/langgraph) for the loop. [vLLM](https://github.com/vllm-project/vllm) for inference.
+Built with [LangGraph](https://github.com/langchain-ai/langgraph). Inference via [vLLM](https://github.com/vllm-project/vllm). Optional tracing via [LangSmith](https://smith.langchain.com).
 
-| Model | When |
-|-------|------|
-| Qwen-7B | Planning, grep, small edits |
-| Qwen-32B | After repeated test failures or large diffs |
-
-## Quick start
-
-Python 3.11+, GPU, model weights.
+## Setup
 
 ```bash
 pip install -e .
-./scripts/start_vllm.sh   # separate terminal
-agent solve "add input validation to the signup form"
+export VLLM_BASE_URL="http://localhost:8000/v1"
+export VLLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 ```
 
-`--baseline` disables routing and cache-aware retrieval. Always uses Qwen-32B.
+Start vLLM on a GPU (local or remote), or tunnel to a cloud instance:
 
-## Baseline vs optimized
+```bash
+./scripts/start_vllm.sh
+```
 
-| | Optimized | Baseline (`--baseline`) |
-|---|-----------|------------------------|
-| Model routing | 7B default, 32B when stuck | Always 32B |
-| Retrieval | Relevance + recency boost | Semantic only |
-| Everything else | Same graph, same tools | Same |
+## LangSmith tracing
 
-## Project layout
+Set env vars to trace every run in the [LangSmith UI](https://smith.langchain.com):
+
+```bash
+export LANGSMITH_TRACING=true
+export LANGSMITH_API_KEY="lsv2_..."
+export LANGSMITH_PROJECT="coding-agent"
+```
+
+Each `agent` run shows:
+
+- **Graph trace** — `plan` and `execute` nodes, step-by-step
+- **LLM calls** — each `vllm_chat` span with prompts and responses
+- **Metadata** — task text, repo path, tags
+
+No code changes needed beyond the env vars.
+
+## Usage
+
+```bash
+cd your-project
+agent "add input validation to the signup form"
+```
+
+Runs from anywhere inside a git repo — uses the repo root automatically.
+
+```bash
+agent "refactor auth.py" --repo /path/to/other/project
+```
+
+## Layout
 
 ```
 agent/
-  graph.py      # the loop
-  nodes.py      # plan, execute, verify, report
-  tools.py      # read / write / grep / bash
-  llm.py        # vLLM client
-  metrics.py    # cost and cache numbers
-  router.py     # 7B vs 32B
-  retrieval.py  # context ranking
+  cli.py      # entry point
+  graph.py    # LangGraph loop
+  nodes.py    # plan + execute
+  tools.py    # read / write / grep / list / bash
+  llm.py      # vLLM client
+  repo.py     # find git root
+  tracing.py  # LangSmith helpers
 config.py
-eval/
 ```
-
-## Results
-
-| | Baseline | Optimized |
-|---|----------|-----------|
-| Tasks solved | TBD | TBD |
-| Avg cost / task | TBD | TBD |
-| Avg latency | TBD | TBD |
-| Cache hit rate | TBD | TBD |
