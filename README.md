@@ -2,7 +2,7 @@
 
 CLI coding agent. You give it a task; it explores your repo, edits or creates files, and reports what it changed.
 
-Inference runs on a GPU via [vLLM](https://github.com/vllm-project/vllm). The agent runs on your machine.
+Inference runs against any OpenAI-compatible chat completions endpoint — [vLLM](https://github.com/vllm-project/vllm) on a GPU, [Ollama](https://ollama.com) locally, or a hosted API. The agent runs on your machine.
 
 ## What it does
 
@@ -32,7 +32,9 @@ you: agent "add error handling to the signup form"
 pip install -e .
 ```
 
-**2. Start vLLM** on a GPU (local or cloud)
+**2. Start an LLM server**
+
+Option A — vLLM on a GPU (local or cloud):
 
 ```bash
 ./scripts/start_vllm.sh
@@ -44,11 +46,23 @@ Remote GPU (e.g. vast.ai), tunnel to your Mac:
 ssh -N -L 8001:127.0.0.1:8000 -p <PORT> root@<GPU_IP>
 ```
 
+Option B — Ollama locally (no GPU needed, works on Mac):
+
+```bash
+ollama pull qwen2.5:7b-instruct
+ollama serve
+```
+
 **3. Point the agent at it**
 
 ```bash
-export VLLM_BASE_URL="http://localhost:8001/v1"
-export VLLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
+# vLLM
+export LLM_BASE_URL="http://localhost:8001/v1"
+export LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
+
+# Ollama
+export LLM_BASE_URL="http://localhost:11434/v1"
+export LLM_MODEL="qwen2.5:7b-instruct"
 ```
 
 **4. Run**
@@ -95,7 +109,7 @@ Each run logs graph nodes (`plan`, `execute`), LLM calls, and task metadata.
 ## Stack
 
 - [LangGraph](https://github.com/langchain-ai/langgraph) for the plan/execute graph
-- [vLLM](https://github.com/vllm-project/vllm) for GPU inference
+- [vLLM](https://github.com/vllm-project/vllm) or [Ollama](https://ollama.com) for inference (any OpenAI-compatible server works)
 - [LangSmith](https://smith.langchain.com) for tracing
 
 ## Project layout
@@ -106,7 +120,7 @@ agent/
   graph.py     # LangGraph wiring
   nodes.py     # plan + execute nodes
   tools.py     # read / write / grep / list / bash
-  llm.py       # vLLM HTTP client
+  llm.py       # OpenAI-compatible HTTP client
   repo.py      # git root detection
   tracing.py   # LangSmith helpers
 config.py      # model, URL, step limit
